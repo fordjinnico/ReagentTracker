@@ -50,47 +50,13 @@ close:SetScript("OnClick", function() detailFrame:Hide() end)
 
 detailFrame.rows = {}
 
--- Функція для оновлення параметрів тултіпу
-function RT:UpdateDetailFrameSettings()
-    if not detailFrame then return end
-
-    -- Перевірка значення detailScale
-    local scale = self.db.detailScale or 1
-    if scale < 0.5 then scale = 0.5 end
-    if scale > 1.5 then scale = 1.5 end
-    self.db.detailScale = scale
-
-    -- Застосовуємо масштабування
-    detailFrame:SetScale(scale)
-
-    local fSize = self.db.detailFontSize or 12
-    local fPath = "Fonts\\FRIZQT__.TTF"
-
-    if detailFrame.title then
-        detailFrame.title:SetFont(fPath, fSize + 2, "OUTLINE")
-    end
-
-    for _, row in ipairs(detailFrame.rows) do
-        if row.name then row.name:SetFont(fPath, fSize, "") end
-        if row.total then row.total:SetFont(fPath, fSize, "OUTLINE") end
-        if row.subRows then
-            for _, sr in ipairs(row.subRows) do
-                if sr.char then sr.char:SetFont(fPath, fSize - 2, "") end
-                if sr.details then sr.details:SetFont(fPath, fSize - 2, "") end
-            end
-        end
-    end
-end
-
 local function ShowDetailMenu(anchor, entry, title)
     if not RT.db then return end
     
     -- Перевірка: якщо це не таблиця (одиничний предмет), меню не показуємо
     if type(entry) ~= "table" then return end
 
-    -- Оновлюємо масштабування перед показом
-    RT:UpdateDetailFrameSettings()
-
+    detailFrame:SetScale(RT.db.detailScale or 1)
     local fSize = RT.db.detailFontSize or 12
     local fPath = "Fonts\\FRIZQT__.TTF"
 
@@ -248,8 +214,6 @@ function RT:UpdateTracker()
     for _, f in ipairs(self.icons or {}) do f:Hide() end
     self.icons = self.icons or {}
     wipe(self.icons)
-
-    self:UpdateDetailFrameSettings() -- Додаємо цей виклик
 
     local activeElements = {}
     local function Collect(data, exp)
