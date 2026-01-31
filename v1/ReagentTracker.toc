@@ -1,0 +1,11 @@
+## Interface: 120000
+## Title: Reagent Tracker
+## Notes: Tracks selected reagents across bags, bank and warband
+## Author: Fly Dev
+## Version: 0.1
+## SavedVariables: ReagentTrackerDB
+
+data.lua
+core.lua
+tracker.lua
+options.lua
