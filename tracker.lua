@@ -1,19 +1,17 @@
 local addonName, RT = ...
+RT.IconFrames = RT.IconFrames or {}
 
--- Допоміжна функція для ключів БД
 local function GetReagentKey(entry)
     if type(entry) == "table" then return table.concat(entry, "_") end
     return tostring(entry)
 end
 
--- Отримання іконки якості
 local function GetQualityIcon(quality)
     if not quality or quality < 1 or quality > 3 then return "" end
     local atlas = ({"Professions-Icon-Quality-Tier1", "Professions-Icon-Quality-Tier2", "Professions-Icon-Quality-Tier3"})[quality]
     return CreateAtlasMarkup(atlas, 18, 18)
 end
 
--- Отримання кольору імені персонажа
 local function GetClassColorName(fullName)
     if not fullName then return "|cffccccccUnknown|r" end
     local shortName = string.split("-", fullName)
@@ -206,8 +204,11 @@ function RT:UpdateTracker()
     self.db.goals = self.db.goals or {}
     self.db.enabled = self.db.enabled or {}
     self.db.showExpansion = self.db.showExpansion or {}
+
+    for _, f in ipairs(RT.IconFrames) do
+        f:Hide()
+    end
     
-    if self.icons then for _, f in ipairs(self.icons) do f:Hide() end end
     self.icons = self.icons or {}
     wipe(self.icons)
 
@@ -215,9 +216,13 @@ function RT:UpdateTracker()
     local function Collect(data, exp)
         if exp and self.db.showExpansion[exp] == false then return end
         if type(data) == "table" and data[1] then
-            for _, e in ipairs(data) do if self.db.enabled[GetReagentKey(e)] then table.insert(activeElements, e) end end
+            for _, e in ipairs(data) do 
+                if self.db.enabled[GetReagentKey(e)] then table.insert(activeElements, e) end 
+            end
         else
-            for _, sub in pairs(data) do if type(sub) == "table" then Collect(sub, exp) end end
+            for _, sub in pairs(data) do 
+                if type(sub) == "table" then Collect(sub, exp) end 
+            end
         end
     end
     if RT_REAGENTS then for k, v in pairs(RT_REAGENTS) do Collect(v, k) end end
@@ -232,51 +237,57 @@ function RT:UpdateTracker()
     if pos == "Bottom" then mainAnchor = "TOP" end
     if pos == "Top" then mainAnchor = "BOTTOM" end
 
-    for _, entry in ipairs(activeElements) do
+    for i, entry in ipairs(activeElements) do
         local key = GetReagentKey(entry)
         local displayID = type(entry) == "table" and (type(entry[1]) == "table" and entry[1][1] or entry[1]) or entry
         local count = self:GetAccountWideCount(entry)
         local goal = self.db.goals[key]
 
-        local row = CreateFrame("Frame", nil, self.frame)
+        local row = RT.IconFrames[i]
+        if not row then
+            row = CreateFrame("Frame", nil, self.frame)
+            row:EnableMouse(true)
+            row:RegisterForDrag("LeftButton")
+            
+            row.tex = row:CreateTexture(nil, "ARTWORK")
+            row.tex:SetAllPoints(row)
+            
+            row.txt = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            row.fsIcon = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            
+            RT.IconFrames[i] = row
+        end
+
+        row:Show()
         row:SetSize(self.db.iconSize, self.db.iconSize)
-        row:EnableMouse(true)
-        row:RegisterForDrag("LeftButton")
 
-        local tex = row:CreateTexture(nil, "ARTWORK")
-        tex:SetAllPoints(row)
-        tex:SetTexture(C_Item.GetItemIconByID(displayID))
-
-        local txt = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        txt:SetFont(txt:GetFont(), self.db.nameFontSize)
+        row.tex:SetTexture(C_Item.GetItemIconByID(displayID))
         
+        row.txt:SetFont(row.txt:GetFont(), self.db.nameFontSize)
         local nameStr = C_Item.GetItemNameByID(displayID) or "Loading..."
         local countText = (goal and goal > 0) and string.format("%d/%d", count, goal) or tostring(count)
-        txt:SetText((self.db.showNames and self.db.showCountInName) and (nameStr .. ": " .. countText) or (self.db.showNames and nameStr or (self.db.showCountInName and countText or "")))
         
-        txt:ClearAllPoints()
-        if pos == "Right" then txt:SetPoint("LEFT", row, "RIGHT", 8, 0)
-        elseif pos == "Left" then txt:SetPoint("RIGHT", row, "LEFT", -8, 0)
-        elseif pos == "Top" then txt:SetPoint("BOTTOM", row, "TOP", 0, 4)
-        elseif pos == "Bottom" then txt:SetPoint("TOP", row, "BOTTOM", 0, -4) end
-        txt:SetShown(self.db.showNames or self.db.showCountInName)
+        row.txt:SetText((self.db.showNames and self.db.showCountInName) and (nameStr .. ": " .. countText) or (self.db.showNames and nameStr or (self.db.showCountInName and countText or "")))
+        
+        row.txt:ClearAllPoints()
+        if pos == "Right" then row.txt:SetPoint("LEFT", row, "RIGHT", 8, 0)
+        elseif pos == "Left" then row.txt:SetPoint("RIGHT", row, "LEFT", -8, 0)
+        elseif pos == "Top" then row.txt:SetPoint("BOTTOM", row, "TOP", 0, 4)
+        elseif pos == "Bottom" then row.txt:SetPoint("TOP", row, "BOTTOM", 0, -4) end
+        row.txt:SetShown(self.db.showNames or self.db.showCountInName)
 
-        if goal and count >= goal then txt:SetTextColor(0, 1, 0) else txt:SetTextColor(1, 0.82, 0) end
+        if goal and count >= goal then row.txt:SetTextColor(0, 1, 0) else row.txt:SetTextColor(1, 0.82, 0) end
 
-        local fsIcon = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        fsIcon:SetPoint("BOTTOMRIGHT", row, -1, 1)
-        fsIcon:SetFont(fsIcon:GetFont(), self.db.counterFontSize, "OUTLINE")
-        fsIcon:SetText(countText); fsIcon:SetTextColor(1, 1, 1); fsIcon:SetShown(self.db.showCountOnIcon)
+        row.fsIcon:ClearAllPoints()
+        row.fsIcon:SetPoint("BOTTOMRIGHT", row, -1, 1)
+        row.fsIcon:SetFont(row.fsIcon:GetFont(), self.db.counterFontSize, "OUTLINE")
+        row.fsIcon:SetText(countText)
+        row.fsIcon:SetTextColor(1, 1, 1)
+        row.fsIcon:SetShown(self.db.showCountOnIcon)
 
         row:SetScript("OnEnter", function(s)
             if IsMouseButtonDown("LeftButton") then return end
-            if detailFrame:IsShown() then
-                local x, _ = s:GetCenter()
-                if x > (GetScreenWidth() / 2) then GameTooltip:SetOwner(s, "ANCHOR_LEFT")
-                else GameTooltip:SetOwner(s, "ANCHOR_RIGHT") end
-            else 
-                GameTooltip:SetOwner(s, "ANCHOR_RIGHT") 
-            end
+            GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
             if type(entry) == "table" then
                 GameTooltip:AddLine(nameStr, 1, 0.82, 0)
                 for _, id in ipairs(entry) do
@@ -289,9 +300,7 @@ function RT:UpdateTracker()
             else GameTooltip:SetItemByID(displayID) end
             GameTooltip:Show()
         end)
-
         row:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
         row:SetScript("OnMouseDown", function(_, btn)
             if btn == "LeftButton" then ShowDetailMenu(row, entry, nameStr)
             elseif btn == "RightButton" then 
@@ -299,15 +308,13 @@ function RT:UpdateTracker()
                 if popup then popup.data = { key = key } end
             end
         end)
-
         row:SetScript("OnDragStart", function() 
             if not self.db.locked then 
                 GameTooltip:Hide() 
-                detailFrame:Hide() -- Тепер закриваємо і велике меню теж
+                detailFrame:Hide() 
                 self.frame:StartMoving() 
             end 
         end)
-
         row:SetScript("OnDragStop", function() 
             self.frame:StopMovingOrSizing() 
             local p, _, rp, x, y = self.frame:GetPoint()
@@ -320,15 +327,15 @@ function RT:UpdateTracker()
         
         if isH then
             row:SetPoint("LEFT", self.frame, "LEFT", offsetX, 0)
-            local rowW = iconSize + (txt:IsShown() and (txt:GetStringWidth() + 12) or 0)
+            local rowW = iconSize + (row.txt:IsShown() and (row.txt:GetStringWidth() + 12) or 0)
             offsetX = offsetX + rowW + spacing
             maxRowHeight = math.max(maxRowHeight, iconSize)
             maxRowWidth = offsetX
         else
             row:SetPoint(mainAnchor, self.frame, mainAnchor, 0, offsetY)
-            local rowH = iconSize + (txt:IsShown() and (pos == "Top" or pos == "Bottom") and (txt:GetStringHeight() + 8) or 0)
+            local rowH = iconSize + (row.txt:IsShown() and (pos == "Top" or pos == "Bottom") and (row.txt:GetStringHeight() + 8) or 0)
             offsetY = offsetY - rowH - spacing
-            maxRowWidth = math.max(maxRowWidth, iconSize + (txt:IsShown() and (pos == "Left" or pos == "Right") and (txt:GetStringWidth() + 12) or 0))
+            maxRowWidth = math.max(maxRowWidth, iconSize + (row.txt:IsShown() and (pos == "Left" or pos == "Right") and (row.txt:GetStringWidth() + 12) or 0))
             maxRowHeight = math.abs(offsetY)
         end
         table.insert(self.icons, row)

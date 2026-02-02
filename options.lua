@@ -74,7 +74,6 @@ local function CreateScrollableContent(parent)
 end
 
 local function CreateGeneralOptions(parent)
-    -- Перевірка, чи завантажена база даних
     if not RT.db then
         local errorMsg = parent:CreateFontString(nil, "ARTWORK", "GameFontNormal")
         errorMsg:SetPoint("CENTER")
@@ -123,10 +122,8 @@ local function CreateGeneralOptions(parent)
     cName:SetPoint("TOPLEFT", cIcon, "BOTTOMLEFT", 0, -5); cName.text:SetText("Count in Name")
     cName:SetChecked(RT.db.showCountInName); cName:SetScript("OnClick", function(self) RT.db.showCountInName = self:GetChecked(); RT:UpdateTracker() end)
 
-    -- ФУНКЦІЯ ДЛЯ ПРАВИЛЬНИХ СЛАЙДЕРІВ (ВИРІВНЯНИХ)
     local function CreateSlider(label, min, max, dbKey, rel, yOff, step)
         local s = CreateFrame("Slider", nil, parent, "OptionsSliderTemplate")
-        -- Використовуємо абсолютну прив'язку по X, щоб уникнути "драбинки"
         s:SetPoint("TOPLEFT", parent, "TOPLEFT", 10, yOff) 
         s:SetMinMaxValues(min, max); s:SetValueStep(step or 1); s:SetWidth(200)
         s.Text:SetText(label .. ": " .. (RT.db[dbKey] or min))
@@ -134,10 +131,8 @@ local function CreateGeneralOptions(parent)
         s:SetScript("OnValueChanged", function(self, v)
             if step and step < 1 then v = math.floor(v * 100) / 100 else v = math.floor(v) end
             RT.db[dbKey] = v; self.Text:SetText(label .. ": " .. v); RT:UpdateTracker()
-            -- Динамічне оновлення меню деталей
             if RT_DetailMenu and RT_DetailMenu:IsShown() then 
                 RT_DetailMenu:SetScale(RT.db.detailScale or 1)
-                -- Оновлюємо шрифти в реальному часі
                 local fPath, fSize = "Fonts\\FRIZQT__.TTF", RT.db.detailFontSize or 12
                 if RT_DetailMenu.title then RT_DetailMenu.title:SetFont(fPath, fSize + 2, "OUTLINE") end
                 for _, row in ipairs(RT_DetailMenu.rows) do
@@ -155,7 +150,6 @@ local function CreateGeneralOptions(parent)
         return s
     end
 
-    -- Координати Y для слайдерів (фіксовані кроки)
     local s1 = CreateSlider("Icon Size", 16, 64, "iconSize", nil, -260)
     local s2 = CreateSlider("Counter Font", 8, 30, "counterFontSize", nil, -300)
     local s3 = CreateSlider("Name Font", 8, 24, "nameFontSize", nil, -340)
@@ -197,13 +191,14 @@ local function PopulateExpansionTab(frame, key)
     local y = -15
     local loopData = (data[1] ~= nil) and { [EXPANSION_NAMES[key] or key] = data } or data
     
-    -- 1. Створюємо список ключів для сортування
     local sortedCategories = {}
     for catName in pairs(loopData) do
         table.insert(sortedCategories, catName)
     end
     
-    -- 2. Сортування за пріоритетом (можна налаштувати під себе)
+    -- =====================
+    -- Inner categories order for menu
+    -- =====================
     local categoryOrder = {
         ["Mining"] = 1, ["Herbalism"] = 2, 
         ["Leather"] = 3, ["Cloth"] = 4, ["Essences"] = 5, ["Motes"] = 5, ["Fishing"] = 6, ["Food"] = 7
@@ -215,7 +210,6 @@ local function PopulateExpansionTab(frame, key)
         return orderA < orderB
     end)
     
-    -- 3. Тепер ідемо по відсортованих категоріях
     for _, catName in ipairs(sortedCategories) do
         local reagents = loopData[catName]
         
@@ -248,7 +242,6 @@ local function PopulateExpansionTab(frame, key)
             nameText:SetJustifyH("CENTER")
             nameText:SetWordWrap(true)
             
-            -- Фікс "трьох крапок"
             local currentName = C_Item.GetItemNameByID(displayID)
             if currentName and currentName ~= "" then
                 nameText:SetText(currentName)
@@ -311,7 +304,6 @@ end)
 local category = Settings.RegisterCanvasLayoutCategory(panel, panel.name)
 Settings.RegisterAddOnCategory(category)
 
-
 local function SlashHandler(msg)
     msg = msg:lower():trim()
     
@@ -332,6 +324,5 @@ local function SlashHandler(msg)
     end
 end
 
--- Реєстрація команд
 SlashCmdList["REAGENTTRACKER"] = SlashHandler
 SLASH_REAGENTTRACKER1, SLASH_REAGENTTRACKER2, SLASH_REAGENTTRACKER3 = "/reagents", "/rtr", "/reagenttracker"

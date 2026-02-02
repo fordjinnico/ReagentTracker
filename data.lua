@@ -1,14 +1,17 @@
 RT_REAGENTS = {
     Lumber = {
-        Classic = {
             245586, -- Ironwood Lumber (Classic)
-        },
-        245586, -- Ironwood Lumber (Classic)
-        242691, -- Olemba Lumber (Outland)
-        251764, -- Ashwood Lumber (Cataclysm)
-        251767, -- Fel-touched Lumber (Legion)
-        251773, -- Dragonpine Lumber (Dragonflight)
-        248012, -- Dornic Fir Lumber (The War Within)
+            242691, -- Olemba Lumber (Outland)
+            251762, -- Coldwind Lumber (Northrend)
+            251764, -- Ashwood Lumber (Cataclysm)
+            251763, -- Bamboo Lumber (Pandaria)
+            251766, -- Shadowmoon Lumber (Draenor)
+            251767, -- Fel-touched Lumber (Legion)
+            251768, -- Darkpine Lumber (Battle for Azeroth)
+            251772, -- Arden Lumber (Shadowlands)
+            251773, -- Dragonpine Lumber (Dragon Islands)
+            248012, -- Dornic Fir Lumber (The War Within)
+            256963, -- Thalassian Lumber (Midnight)
     },
 
     Classic = {
