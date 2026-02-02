@@ -104,7 +104,6 @@ local function ShowDetailMenu(anchor, entry, title)
             end
         end
 
-        -- ВИПРАВЛЕНО: Відображаємо завжди, навіть якщо itemTotal == 0
         if not detailFrame.rows[rowIndex] then
             local r = CreateFrame("Frame", nil, detailFrame)
             r:SetSize(MENU_WIDTH - 20, ROW_HEIGHT_ITEM)
@@ -131,7 +130,6 @@ local function ShowDetailMenu(anchor, entry, title)
         r.icon:SetTexture(C_Item.GetItemIconByID(id))
         local q = C_TradeSkillUI.GetItemReagentQualityByItemInfo(id)
         
-        -- Сірий колір для нулів, щоб не муляло очі
         local colorPrefix = itemTotal > 0 and "" or "|cff888888"
         r.name:SetText(colorPrefix .. (C_Item.GetItemNameByID(id) or "Loading...") .. "|r " .. GetQualityIcon(q))
         r.total:SetText(colorPrefix .. itemTotal .. "|r")
@@ -229,9 +227,6 @@ function RT:UpdateTracker()
     local pos = self.db.textPosition or "Right"
     local isH = (self.db.orientation == "Horizontal")
 
-    -- Визначаємо якір (Anchor) для всього списку
-    -- Якщо текст справа, іконки мають бути зліва (TOPLEFT)
-    -- Якщо текст зліва, іконки мають бути справа (TOPRIGHT)
     local mainAnchor = "TOPLEFT"
     if pos == "Left" and not isH then mainAnchor = "TOPRIGHT" end
     if pos == "Bottom" then mainAnchor = "TOP" end
@@ -259,7 +254,6 @@ function RT:UpdateTracker()
         local countText = (goal and goal > 0) and string.format("%d/%d", count, goal) or tostring(count)
         txt:SetText((self.db.showNames and self.db.showCountInName) and (nameStr .. ": " .. countText) or (self.db.showNames and nameStr or (self.db.showCountInName and countText or "")))
         
-        -- Позиціонування тексту відносно іконки
         txt:ClearAllPoints()
         if pos == "Right" then txt:SetPoint("LEFT", row, "RIGHT", 8, 0)
         elseif pos == "Left" then txt:SetPoint("RIGHT", row, "LEFT", -8, 0)
@@ -274,25 +268,30 @@ function RT:UpdateTracker()
         fsIcon:SetFont(fsIcon:GetFont(), self.db.counterFontSize, "OUTLINE")
         fsIcon:SetText(countText); fsIcon:SetTextColor(1, 1, 1); fsIcon:SetShown(self.db.showCountOnIcon)
 
-        -- Скрипти (OnEnter, OnMouseDown тощо залишаємо без змін)
         row:SetScript("OnEnter", function(s)
+            if IsMouseButtonDown("LeftButton") then return end
             if detailFrame:IsShown() then
                 local x, _ = s:GetCenter()
                 if x > (GetScreenWidth() / 2) then GameTooltip:SetOwner(s, "ANCHOR_LEFT")
                 else GameTooltip:SetOwner(s, "ANCHOR_RIGHT") end
-            else GameTooltip:SetOwner(s, "ANCHOR_RIGHT") end
+            else 
+                GameTooltip:SetOwner(s, "ANCHOR_RIGHT") 
+            end
             if type(entry) == "table" then
                 GameTooltip:AddLine(nameStr, 1, 0.82, 0)
                 for _, id in ipairs(entry) do
                     local totalForID = self:GetAccountWideCount(id)
                     local q = C_TradeSkillUI.GetItemReagentQualityByItemInfo(id)
-                    GameTooltip:AddDoubleLine(GetQualityIcon(q) .. " " .. (C_Item.GetItemNameByID(id) or ""), (totalForID > 0 and "|cffffffff" or "|cff888888") .. totalForID .. "|r")
+                    local countCol = totalForID > 0 and "|cffffffff" or "|cff888888"
+                    GameTooltip:AddDoubleLine(GetQualityIcon(q) .. " " .. (C_Item.GetItemNameByID(id) or "Loading..."), countCol .. totalForID .. "|r")
                 end
                 GameTooltip:AddLine("\n|cff00ff00<Left-Click to Pin Details>|r")
             else GameTooltip:SetItemByID(displayID) end
             GameTooltip:Show()
         end)
+
         row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
         row:SetScript("OnMouseDown", function(_, btn)
             if btn == "LeftButton" then ShowDetailMenu(row, entry, nameStr)
             elseif btn == "RightButton" then 
@@ -300,16 +299,21 @@ function RT:UpdateTracker()
                 if popup then popup.data = { key = key } end
             end
         end)
-        row:SetScript("OnDragStart", function() if not self.db.locked then self.frame:StartMoving() end end)
+
+        row:SetScript("OnDragStart", function() 
+            if not self.db.locked then 
+                GameTooltip:Hide() 
+                detailFrame:Hide() -- Тепер закриваємо і велике меню теж
+                self.frame:StartMoving() 
+            end 
+        end)
+
         row:SetScript("OnDragStop", function() 
             self.frame:StopMovingOrSizing() 
             local p, _, rp, x, y = self.frame:GetPoint()
             self.db.position = { point = p, relativePoint = rp, x = x, y = y }
         end)
 
-        -- =====================
-        -- ЛОГІКА РОЗМІЩЕННЯ (FIXED)
-        -- =====================
         row:ClearAllPoints()
         local spacing = self.db.spacing or 5
         local iconSize = self.db.iconSize
@@ -327,10 +331,8 @@ function RT:UpdateTracker()
             maxRowWidth = math.max(maxRowWidth, iconSize + (txt:IsShown() and (pos == "Left" or pos == "Right") and (txt:GetStringWidth() + 12) or 0))
             maxRowHeight = math.abs(offsetY)
         end
-        
         table.insert(self.icons, row)
     end
-    
     self.frame:SetSize(maxRowWidth > 0 and maxRowWidth or 32, maxRowHeight > 0 and maxRowHeight or 32)
 end
 
