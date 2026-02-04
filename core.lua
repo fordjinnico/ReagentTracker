@@ -92,6 +92,7 @@ f:RegisterEvent("PLAYER_LOGIN")
 f:RegisterEvent("BAG_UPDATE_DELAYED")
 f:RegisterEvent("BANKFRAME_CLOSED")
 f:RegisterEvent("PLAYER_LOGOUT")
+f:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 
 local isThrottled = false
 
@@ -132,12 +133,18 @@ f:SetScript("OnEvent", function(_, event, addon)
         if not isThrottled and RT.db then
             isThrottled = true
             C_Timer.After(0.3, function()
-                SyncActiveOnly() 
+                SyncActiveOnly()
                 if RT.UpdateTracker then RT:UpdateTracker() end
                 isThrottled = false
             end)
         end
     end
+    
+    if event == "GET_ITEM_INFO_RECEIVED" then
+    if RT.UpdateTracker then
+        RT:UpdateTracker()
+    end
+end
 end)
 
 StaticPopupDialogs["RT_SET_GOAL"] = {
