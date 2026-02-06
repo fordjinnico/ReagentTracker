@@ -302,10 +302,19 @@ function RT:UpdateTracker()
         end)
         row:SetScript("OnLeave", function() GameTooltip:Hide() end)
         row:SetScript("OnMouseDown", function(_, btn)
-            if btn == "LeftButton" then ShowDetailMenu(row, entry, nameStr)
-            elseif btn == "RightButton" then 
-                local popup = StaticPopup_Show("RT_SET_GOAL")
-                if popup then popup.data = { key = key } end
+            if btn == "LeftButton" then
+                ShowDetailMenu(row, entry, nameStr)
+            elseif btn == "RightButton" then
+                if IsShiftKeyDown() then
+                    if self.db.goals[key] then
+                        self.db.goals[key] = nil
+                        print("|cffffd100ReagentTracker:|r Goal for " .. nameStr .. " removed")
+                        self:UpdateTracker()
+                    end
+                else
+                    local popup = StaticPopup_Show("RT_SET_GOAL")
+                    if popup then popup.data = { key = key } end
+                end
             end
         end)
         row:SetScript("OnDragStart", function() 

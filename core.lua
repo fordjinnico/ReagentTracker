@@ -26,10 +26,30 @@ local defaults = {
 local function CopyDefaults(src, dst)
     if type(dst) ~= "table" then dst = {} end
     for k, v in pairs(src) do
-        if type(v) == "table" then dst[k] = CopyDefaults(v, dst[k])
-        elseif dst[k] == nil then dst[k] = v end
+        if type(v) == "table" then
+            dst[k] = CopyDefaults(v, dst[k])
+        elseif dst[k] == nil then
+            dst[k] = v
+        end
     end
     return dst
+end
+
+RT.ItemMap = {} 
+
+local function BuildItemMap(tab)
+    for _, entry in pairs(tab) do
+        if type(entry) == "table" then
+            if type(entry[1]) == "number" then
+
+                for _, id in ipairs(entry) do RT.ItemMap[id] = true end
+            else
+                BuildItemMap(entry)
+            end
+        elseif type(entry) == "number" then
+            RT.ItemMap[entry] = true
+        end
+    end
 end
 
 local function UpdateItemData(charKey, id)
@@ -49,23 +69,30 @@ local function SyncAllItems()
     local charKey = UnitName("player") .. "-" .. GetRealmName()
     RT.db.charData[charKey] = RT.db.charData[charKey] or { items = {}, bankItems = {} }
     
-    local _, classFile = UnitClass("player")
-    RT.db.charData[charKey].class = classFile
+    -- Створюємо список всіх ID, які треба оновити
+    local idsToUpdate = {}
+    for id in pairs(RT.ItemMap) do
+        table.insert(idsToUpdate, id)
+    end
 
-    local function DeepScan(tab)
-        for _, entry in pairs(tab) do
-            if type(entry) == "table" then
-                if type(entry[1]) == "number" then
-                    for _, id in ipairs(entry) do UpdateItemData(charKey, id) end
-                else
-                    DeepScan(entry)
-                end
-            elseif type(entry) == "number" then
-                UpdateItemData(charKey, entry)
-            end
+    -- Скануємо пачками по 20 предметів кожні 0.1 сек
+    local index = 1
+    local function BatchUpdate()
+        local count = 0
+        while index <= #idsToUpdate and count < 20 do
+            UpdateItemData(charKey, idsToUpdate[index])
+            index = index + 1
+            count = count + 1
+        end
+
+        if index <= #idsToUpdate then
+            C_Timer.After(0.1, BatchUpdate)
+        else
+            if RT.UpdateTracker then RT:UpdateTracker() end
         end
     end
-    DeepScan(RT_REAGENTS)
+    
+    BatchUpdate()
 end
 
 -- FAST SCAN FOR LOOT UPDATE (Optimized for performance)
@@ -96,7 +123,7 @@ f:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 
 local isThrottled = false
 
-f:SetScript("OnEvent", function(_, event, addon)
+    f:SetScript("OnEvent", function(_, event, addon)
     if event == "ADDON_LOADED" and addon == addonName then
         ReagentTrackerDB = CopyDefaults(defaults, ReagentTrackerDB or {})
         RT.db = ReagentTrackerDB
@@ -105,6 +132,26 @@ f:SetScript("OnEvent", function(_, event, addon)
         RT.db.charSettings = RT.db.charSettings or {}
         RT.db.charSettings[charKey] = RT.db.charSettings[charKey] or { visible = true }
         RT.charDb = RT.db.charSettings[charKey]
+
+        -- 1. Визнач функцію (вона вже у тебе там є)
+        local function BuildItemMap(tab)
+            for _, entry in pairs(tab) do
+                if type(entry) == "table" then
+                    if type(entry[1]) == "number" then
+                        for _, id in ipairs(entry) do RT.ItemMap[id] = true end
+                    else
+                        BuildItemMap(entry)
+                    end
+                elseif type(entry) == "number" then
+                    RT.ItemMap[entry] = true
+                end
+            end
+        end
+
+        -- 2. ОБОВ'ЯЗКОВО ВИКЛИЧ ЇЇ!
+        if RT_REAGENTS then
+            BuildItemMap(RT_REAGENTS)
+        end
     end
 
     if event == "PLAYER_LOGIN" then
@@ -129,16 +176,17 @@ f:SetScript("OnEvent", function(_, event, addon)
         SyncAllItems() 
     end
 
-    if event == "BAG_UPDATE_DELAYED" then
-        if not isThrottled and RT.db then
-            isThrottled = true
-            C_Timer.After(0.3, function()
-                SyncActiveOnly()
-                if RT.UpdateTracker then RT:UpdateTracker() end
-                isThrottled = false
-            end)
-        end
+
+if event == "BAG_UPDATE_DELAYED" then
+    if not isThrottled and RT.db then
+        isThrottled = true
+        C_Timer.After(0.5, function() 
+            SyncActiveOnly() 
+            if RT.UpdateTracker then RT:UpdateTracker() end
+            isThrottled = false
+        end)
     end
+end
     
     if event == "GET_ITEM_INFO_RECEIVED" then
     if RT.UpdateTracker then
