@@ -82,6 +82,25 @@ RT_REAGENTS = {
             4338, -- Mageweave Cloth
             14047, -- Runecloth
         },
+        Gems = {
+            774, -- Malachite
+            818, -- Tigerseye
+            1210, -- Shadowgem
+            1206, -- Moss Agate
+            1529, -- Jade
+            1705, -- Lesser Moonstone
+            3864,  -- Citrine
+            7909, -- Aquamarine
+            7910, -- Star Ruby
+            12363, -- Arcane Crystal
+            12800, -- Azerothian Diamond
+            11754, -- Black Diamond
+            11382, -- Blood Of The Mountain
+            12361, -- Blue Sapphire
+            12364, -- Huge Emerald
+            12799, -- Large Opal
+            18335, -- Pristine Black Diamond
+        },
         Essences = {
             7078, -- Essence of Fire
             7080, -- Essence of Water
@@ -192,6 +211,13 @@ RT_REAGENTS = {
             52986, -- Heartblossom
             52988, -- Whiptail
             52987, -- Twilight Jasmine
+        },
+        Volatiles = {
+            52328, --volatile-air
+            52327, --volatile-earth
+            52325, --volatile-fire
+            52329, --volatile-life
+            52326, --volatile-water
         },
         Cloth = {},
         Fishing = {}
