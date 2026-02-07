@@ -172,14 +172,19 @@ end
 -- ФУНКЦІЇ АККАУНТУ
 -- =====================
 function RT:GetAccountWideCount(entry)
-    if not self.db or not self.db.charData then return 0 end
+    if not self.db then return 0 end
     local itemIDs = (type(entry) == "table") and entry or {entry}
     local total = 0
-    local currentKey = UnitName("player") .. "-" .. GetRealmName()
+    
     for _, id in ipairs(itemIDs) do
-        total = total + (C_Item.GetItemCount(id, true, false, true, true) or 0)
-        for charKey, data in pairs(self.db.charData) do
-            if charKey ~= currentKey then
+        -- 1. Додаємо Варбенд (один раз на весь акаунт)
+        if self.db.warbandItems and self.db.warbandItems[id] then
+            total = total + self.db.warbandItems[id]
+        end
+        
+        -- 2. Додаємо дані по всіх персонажах (сумки + перс. банк)
+        if self.db.charData then
+            for _, data in pairs(self.db.charData) do
                 total = total + (data.items and data.items[id] or 0)
                 total = total + (data.bankItems and data.bankItems[id] or 0)
             end
@@ -301,14 +306,25 @@ function RT:UpdateTracker()
             GameTooltip:Show()
         end)
         row:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        row:SetScript("OnMouseDown", function(_, btn)
-            if btn == "LeftButton" then
-                ShowDetailMenu(row, entry, nameStr)
+row:SetScript("OnMouseDown", function(_, btn)
+            local key = GetReagentKey(entry)
+            if btn == "LeftButton" then 
+                if IsShiftKeyDown() then
+                    -- ШВИДКЕ ВИМКНЕННЯ ТРЕКІНГУ (Shift + ЛКМ)
+                    if self.db.enabled and key then
+                        self.db.enabled[key] = false
+                        print("|cffffd100ReagentTracker:|r Відстеження " .. nameStr .. " вимкнено.")
+                        self:UpdateTracker() -- перемальовуємо трекер, щоб рядок зник
+                    end
+                else
+                    -- Звичайний клік — відкриваємо деталі
+                    ShowDetailMenu(row, entry, nameStr)
+                end
             elseif btn == "RightButton" then
                 if IsShiftKeyDown() then
                     if self.db.goals[key] then
                         self.db.goals[key] = nil
-                        print("|cffffd100ReagentTracker:|r Goal for " .. nameStr .. " removed")
+                        print("|cffffd100ReagentTracker:|r Farm goal for " .. nameStr .. " removed.")
                         self:UpdateTracker()
                     end
                 else

@@ -54,12 +54,21 @@ end
 
 local function UpdateItemData(charKey, id)
     if not id then return end
-    local bCount = C_Item.GetItemCount(id, false, false, false, false) or 0
-    local tCount = C_Item.GetItemCount(id, true, false, true, false) or 0
-    local bankAndWarband = tCount - bCount
+    
+    -- Тільки сумки персонажа
+    local bags = C_Item.GetItemCount(id, false, false, false, false) or 0
+    -- Тільки персональний банк (true - включати банк, false - не включати варбенд)
+    local totalWithBank = C_Item.GetItemCount(id, true, false, false, false) or 0
+    local personalBank = totalWithBank - bags
 
-    RT.db.charData[charKey].items[id] = (bCount > 0) and bCount or nil
-    RT.db.charData[charKey].bankItems[id] = (bankAndWarband > 0) and bankAndWarband or nil
+    RT.db.charData[charKey].items[id] = (bags > 0) and bags or nil
+    RT.db.charData[charKey].bankItems[id] = (personalBank > 0) and personalBank or nil
+    
+    -- Варбенд банк (окремий ключ у БД, щоб не дублювати на кожного чара)
+    RT.db.warbandItems = RT.db.warbandItems or {}
+    local totalWithWarband = C_Item.GetItemCount(id, true, false, true, true) or 0
+    local warbandOnly = totalWithWarband - totalWithBank
+    RT.db.warbandItems[id] = (warbandOnly > 0) and warbandOnly or nil
 end
 
 -- FULL SCAN FOR LOGIN/BANK SCREEN LOADED/LOGOUT
@@ -69,13 +78,11 @@ local function SyncAllItems()
     local charKey = UnitName("player") .. "-" .. GetRealmName()
     RT.db.charData[charKey] = RT.db.charData[charKey] or { items = {}, bankItems = {} }
     
-    -- Створюємо список всіх ID, які треба оновити
     local idsToUpdate = {}
     for id in pairs(RT.ItemMap) do
         table.insert(idsToUpdate, id)
     end
 
-    -- Скануємо пачками по 20 предметів кожні 0.1 сек
     local index = 1
     local function BatchUpdate()
         local count = 0
@@ -196,26 +203,42 @@ end
 end)
 
 StaticPopupDialogs["RT_SET_GOAL"] = {
-    text = "Enter farm goal for reagent (0 for reset):",
+    text = "Enter farm goal (e.g. 100, +50 or -20):",
     button1 = "Save",
     button2 = "Cancel",
     hasEditBox = true,
-    maxLetters = 10,
+    maxLetters = 15,
     OnAccept = function(self)
         local data = self.data 
         local editBox = self.EditBox or _G[self:GetName().."EditBox"]
         if editBox and data and data.key then
             local text = editBox:GetText()
-            local goal = tonumber(text)
-            if goal then
-                RT.db.goals = RT.db.goals or {}
-                if goal <= 0 then
-                    RT.db.goals[data.key] = nil
-                else
-                    RT.db.goals[data.key] = goal
-                end
-                RT:UpdateTracker()
+            
+            RT.db.goals = RT.db.goals or {}
+            local currentGoal = RT.db.goals[data.key] or 0
+            
+
+            local firstChar = text:sub(1, 1)
+            local modifier = tonumber(text:match("^[%+%-]%d+")) 
+            local absoluteValue = tonumber(text) 
+            
+            local newGoal = 0
+            
+            if modifier then
+                newGoal = currentGoal + modifier
+            elseif absoluteValue then
+                newGoal = absoluteValue
+            else
+                return 
             end
+
+            if newGoal <= 0 then
+                RT.db.goals[data.key] = nil
+            else
+                RT.db.goals[data.key] = newGoal
+            end
+            
+            RT:UpdateTracker()
         end
     end,
     EditBoxOnEnterPressed = function(self)
@@ -231,6 +254,7 @@ StaticPopupDialogs["RT_SET_GOAL"] = {
             local currentGoal = RT.db.goals[data.key] or ""
             editBox:SetText(currentGoal)
             editBox:SetFocus()
+            editBox:HighlightText()
         end
     end,
     timeout = 0,
