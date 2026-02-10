@@ -2,7 +2,7 @@
 ## Title: Reagent Tracker
 ## Notes: Tracks selected reagents across bags, bank and warband
 ## Author: Fly Dev
-## Version: 1.0.6
+## Version: 1.0.7
 ## SavedVariables: ReagentTrackerDB
 
 data.lua

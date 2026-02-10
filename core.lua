@@ -55,16 +55,13 @@ end
 local function UpdateItemData(charKey, id)
     if not id then return end
     
-    -- Тільки сумки персонажа
     local bags = C_Item.GetItemCount(id, false, false, false, false) or 0
-    -- Тільки персональний банк (true - включати банк, false - не включати варбенд)
     local totalWithBank = C_Item.GetItemCount(id, true, false, false, false) or 0
     local personalBank = totalWithBank - bags
 
     RT.db.charData[charKey].items[id] = (bags > 0) and bags or nil
     RT.db.charData[charKey].bankItems[id] = (personalBank > 0) and personalBank or nil
     
-    -- Варбенд банк (окремий ключ у БД, щоб не дублювати на кожного чара)
     RT.db.warbandItems = RT.db.warbandItems or {}
     local totalWithWarband = C_Item.GetItemCount(id, true, false, true, true) or 0
     local warbandOnly = totalWithWarband - totalWithBank
@@ -102,7 +99,7 @@ local function SyncAllItems()
     BatchUpdate()
 end
 
--- FAST SCAN FOR LOOT UPDATE (Optimized for performance)
+-- FAST SCAN FOR LOOT UPDATE
 local function SyncActiveOnly()
     local charKey = UnitName("player") .. "-" .. GetRealmName()
     if not RT.db.enabled then return end
@@ -140,7 +137,6 @@ local isThrottled = false
         RT.db.charSettings[charKey] = RT.db.charSettings[charKey] or { visible = true }
         RT.charDb = RT.db.charSettings[charKey]
 
-        -- 1. Визнач функцію (вона вже у тебе там є)
         local function BuildItemMap(tab)
             for _, entry in pairs(tab) do
                 if type(entry) == "table" then
@@ -155,7 +151,6 @@ local isThrottled = false
             end
         end
 
-        -- 2. ОБОВ'ЯЗКОВО ВИКЛИЧ ЇЇ!
         if RT_REAGENTS then
             BuildItemMap(RT_REAGENTS)
         end

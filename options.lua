@@ -5,7 +5,7 @@ panel.name = "Reagent Tracker"
 
 local EXPANSION_NAMES = {
     General      = "General",
-    Lumber       = "Lumber",
+    Lumber       = "Housing Lumber",
     Classic      = "Classic",
     Outland      = "Outland",
     Wotlk        = "WoTLK",
@@ -168,7 +168,7 @@ local function CreateGeneralOptions(parent)
     local ds1 = CreateSlider("Menu Scale", 0.5, 2, "detailScale", nil, -510, 0.05)
     local ds2 = CreateSlider("Menu Font Size", 8, 24, "detailFontSize", nil, -550)
 
-    -- Експаншени (права колонка)
+    -- ЕкспЕншени
     local expTitle = parent:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     expTitle:SetPoint("TOPLEFT", parent, "TOP", 60, -10); expTitle:SetText("Show Expansions:")
     local lastExp = expTitle

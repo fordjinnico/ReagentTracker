@@ -28,7 +28,7 @@ local function GetClassColorName(fullName)
 end
 
 -- =====================
--- ДЕТАЛІЗАЦІЯ (MENU)
+-- КАСТОМНИЙ ТУЛТІП
 -- =====================
 local detailFrame = CreateFrame("Frame", "RT_DetailMenu", UIParent, "BackdropTemplate")
 detailFrame:SetClampedToScreen(true)
@@ -177,12 +177,10 @@ function RT:GetAccountWideCount(entry)
     local total = 0
     
     for _, id in ipairs(itemIDs) do
-        -- 1. Додаємо Варбенд (один раз на весь акаунт)
         if self.db.warbandItems and self.db.warbandItems[id] then
             total = total + self.db.warbandItems[id]
         end
         
-        -- 2. Додаємо дані по всіх персонажах (сумки + перс. банк)
         if self.db.charData then
             for _, data in pairs(self.db.charData) do
                 total = total + (data.items and data.items[id] or 0)
@@ -306,14 +304,14 @@ function RT:UpdateTracker()
             GameTooltip:Show()
         end)
         row:SetScript("OnLeave", function() GameTooltip:Hide() end)
-row:SetScript("OnMouseDown", function(_, btn)
+        row:SetScript("OnMouseDown", function(_, btn)
             local key = GetReagentKey(entry)
             if btn == "LeftButton" then 
                 if IsShiftKeyDown() then
                     -- ШВИДКЕ ВИМКНЕННЯ ТРЕКІНГУ (Shift + ЛКМ)
                     if self.db.enabled and key then
                         self.db.enabled[key] = false
-                        print("|cffffd100ReagentTracker:|r Відстеження " .. nameStr .. " вимкнено.")
+                        print("|cffffd100ReagentTracker:|r Tracking for " .. nameStr .. " disabled.")
                         self:UpdateTracker() -- перемальовуємо трекер, щоб рядок зник
                     end
                 else
