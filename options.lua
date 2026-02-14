@@ -168,7 +168,6 @@ local function CreateGeneralOptions(parent)
     local ds1 = CreateSlider("Menu Scale", 0.5, 2, "detailScale", nil, -510, 0.05)
     local ds2 = CreateSlider("Menu Font Size", 8, 24, "detailFontSize", nil, -550)
 
-    -- ЕкспЕншени
     local expTitle = parent:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     expTitle:SetPoint("TOPLEFT", parent, "TOP", 60, -10); expTitle:SetText("Show Expansions:")
     local lastExp = expTitle
@@ -196,9 +195,6 @@ local function PopulateExpansionTab(frame, key)
         table.insert(sortedCategories, catName)
     end
     
-    -- =====================
-    -- Inner categories order for menu
-    -- =====================
     local categoryOrder = {
         ["Mining"] = 1, ["Herbalism"] = 2, 
         ["Leather"] = 3, ["Cloth"] = 4, ["Essences"] = 5, ["Motes"] = 5, ["Fishing"] = 6, ["Food"] = 7

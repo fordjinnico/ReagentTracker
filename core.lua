@@ -68,7 +68,6 @@ local function UpdateItemData(charKey, id)
     RT.db.warbandItems[id] = (warbandOnly > 0) and warbandOnly or nil
 end
 
--- FULL SCAN FOR LOGIN/BANK SCREEN LOADED/LOGOUT
 local function SyncAllItems()
     if not RT.db or not RT.db.charData or not RT_REAGENTS then return end
     
@@ -99,7 +98,6 @@ local function SyncAllItems()
     BatchUpdate()
 end
 
--- FAST SCAN FOR LOOT UPDATE
 local function SyncActiveOnly()
     local charKey = UnitName("player") .. "-" .. GetRealmName()
     if not RT.db.enabled then return end
@@ -124,6 +122,9 @@ f:RegisterEvent("BAG_UPDATE_DELAYED")
 f:RegisterEvent("BANKFRAME_CLOSED")
 f:RegisterEvent("PLAYER_LOGOUT")
 f:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+f:RegisterEvent("AUCTION_HOUSE_CLOSED")
+f:RegisterEvent("AUCTION_HOUSE_SHOW")
+f:RegisterEvent("MAIL_CLOSED")
 
 local isThrottled = false
 
@@ -179,16 +180,24 @@ local isThrottled = false
     end
 
 
-if event == "BAG_UPDATE_DELAYED" then
-    if not isThrottled and RT.db then
-        isThrottled = true
-        C_Timer.After(0.5, function() 
-            SyncActiveOnly() 
-            if RT.UpdateTracker then RT:UpdateTracker() end
-            isThrottled = false
-        end)
+    if event == "BAG_UPDATE_DELAYED" then
+        if not isThrottled and RT.db then
+            isThrottled = true
+            C_Timer.After(0.5, function()
+                local charKey = UnitName("player") .. "-" .. GetRealmName()
+                for id in pairs(RT.ItemMap) do
+                    UpdateItemData(charKey, id)
+                end
+                
+                if RT.UpdateTracker then RT:UpdateTracker() end
+                isThrottled = false
+            end)
+        end
     end
-end
+
+    if event == "AUCTION_HOUSE_CLOSED" or event == "MAIL_CLOSED" then
+        SyncAllItems() 
+    end
     
     if event == "GET_ITEM_INFO_RECEIVED" then
     if RT.UpdateTracker then

@@ -82,6 +82,11 @@ RT_REAGENTS = {
             4338, -- Mageweave Cloth
             14047, -- Runecloth
         },
+        Pigments = {
+            39151, -- Alabaster Pigment
+            39334, -- Dusky Pigment
+            43103, -- Verdant Pigment
+        },
         Gems = {
             774, -- Malachite
             818, -- Tigerseye
@@ -401,4 +406,27 @@ RT_REAGENTS = {
         Cloth = {},
         Fishing = {}
   },
+}
+
+RT_PIGMENTREAGENTS = {
+    [765] = { -- Silverleaf milling
+        input = 5,
+        output = {
+            [39151] = 2,
+        }
+    },
+    [785] = { -- Mageroyal milling
+        input = 5,
+        output = {
+            [39334] = 2,
+            [43103] = 0.5,
+        }
+    },
+    [2450] = { -- Briarthorn milling
+        input = 5,
+        output = {
+            [39334] = 2,
+            [43103] = 0.5,
+        }
+    },
 }
