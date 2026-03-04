@@ -30,6 +30,27 @@ local ROW_SPACING = 68
 local calcFS = panel:CreateFontString(nil, "ARTWORK", "GameFontNormal")
 calcFS:Hide()
 
+local function OnItemNameReady(itemID, callback)
+    local currentName = C_Item.GetItemNameByID(itemID)
+    if currentName and currentName ~= "" then
+        callback(currentName)
+        return
+    end
+
+    if C_Item.RequestLoadItemDataByID then
+        C_Item.RequestLoadItemDataByID(itemID)
+    end
+    if Item and Item.CreateFromItemID then
+        local item = Item:CreateFromItemID(itemID)
+        item:ContinueOnItemLoad(function()
+            local loadedName = C_Item.GetItemNameByID(itemID)
+            if loadedName and loadedName ~= "" then
+                callback(loadedName)
+            end
+        end)
+    end
+end
+
 local function UpdateTabStyle(tab, isActive)
     if isActive then tab:LockHighlight(); tab.Text:SetTextColor(1, 0.82, 0)
     else tab:UnlockHighlight(); tab.Text:SetTextColor(1, 1, 1) end
@@ -81,29 +102,44 @@ local function CreateGeneralOptions(parent)
         return
     end
 
+    local leftX = 20
+    local y = -10
+    local function Place(control, height, gap)
+        control:ClearAllPoints()
+        control:SetPoint("TOPLEFT", parent, "TOPLEFT", leftX, y)
+        y = y - (height or 24) - (gap or 8)
+    end
+
     local title = parent:CreateFontString(nil, "ARTWORK", "GameFontNormalLarge")
-    title:SetPoint("TOPLEFT", 20, -10); title:SetText("General Settings")
+    title:SetText("General Settings")
+    Place(title, 20, 10)
 
     local lock = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
-    lock:SetPoint("TOPLEFT", title, "BOTTOMLEFT", 0, -10); lock.text:SetText("Lock Tracker Position")
+    lock.text:SetText("Lock Tracker Position")
     lock:SetChecked(RT.db.locked); lock:SetScript("OnClick", function(self) RT.db.locked = self:GetChecked() end)
+    Place(lock, 24, 8)
 
     local orientBtn = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-    orientBtn:SetPoint("TOPLEFT", lock, "BOTTOMLEFT", 0, -10); orientBtn:SetSize(180, 26)
+    orientBtn:SetSize(180, 26)
     orientBtn:SetText("Orientation: " .. (RT.db.orientation or "Vertical"))
     orientBtn:SetScript("OnClick", function(self)
         RT.db.orientation = (RT.db.orientation == "Vertical") and "Horizontal" or "Vertical"
         self:SetText("Orientation: " .. RT.db.orientation); RT:UpdateTracker()
     end)
+    Place(orientBtn, 26, 10)
 
     local names = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
-    names:SetPoint("TOPLEFT", orientBtn, "BOTTOMLEFT", 0, -10); names.text:SetText("Show Reagent Names")
+    names.text:SetText("Show Reagent Names")
     names:SetChecked(RT.db.showNames); names:SetScript("OnClick", function(self) RT.db.showNames = self:GetChecked(); RT:UpdateTracker() end)
+    Place(names, 24, 6)
 
     local labelPos = parent:CreateFontString(nil, "ARTWORK", "GameFontNormalSmall")
-    labelPos:SetPoint("TOPLEFT", names, "BOTTOMLEFT", 25, -5); labelPos:SetText("Text Position:")
+    labelPos:SetText("Text Position:")
+    labelPos:ClearAllPoints()
+    labelPos:SetPoint("TOPLEFT", parent, "TOPLEFT", leftX + 25, y)
 
     local dropdown = CreateFrame("Frame", "RT_TextPosDropdown", parent, "UIDropDownMenuTemplate")
+    dropdown:ClearAllPoints()
     dropdown:SetPoint("LEFT", labelPos, "RIGHT", -15, -2); UIDropDownMenu_SetWidth(dropdown, 90)
     UIDropDownMenu_SetText(dropdown, RT.db.textPosition or "Right")
     UIDropDownMenu_Initialize(dropdown, function()
@@ -113,18 +149,21 @@ local function CreateGeneralOptions(parent)
             UIDropDownMenu_AddButton(info)
         end
     end)
+    y = y - 36
 
     local cIcon = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
-    cIcon:SetPoint("TOPLEFT", labelPos, "BOTTOMLEFT", -5, -10); cIcon.text:SetText("Count on Icon")
+    cIcon.text:SetText("Count on Icon")
     cIcon:SetChecked(RT.db.showCountOnIcon); cIcon:SetScript("OnClick", function(self) RT.db.showCountOnIcon = self:GetChecked(); RT:UpdateTracker() end)
+    Place(cIcon, 24, 4)
 
     local cName = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate")
-    cName:SetPoint("TOPLEFT", cIcon, "BOTTOMLEFT", 0, -5); cName.text:SetText("Count in Name")
+    cName.text:SetText("Count in Name")
     cName:SetChecked(RT.db.showCountInName); cName:SetScript("OnClick", function(self) RT.db.showCountInName = self:GetChecked(); RT:UpdateTracker() end)
+    Place(cName, 24, 12)
 
     local function CreateSlider(label, min, max, dbKey, rel, yOff, step)
         local s = CreateFrame("Slider", nil, parent, "OptionsSliderTemplate")
-        s:SetPoint("TOPLEFT", parent, "TOPLEFT", 10, yOff) 
+        s:SetPoint("TOPLEFT", parent, "TOPLEFT", 10, y)
         s:SetMinMaxValues(min, max); s:SetValueStep(step or 1); s:SetWidth(200)
         s.Text:SetText(label .. ": " .. (RT.db[dbKey] or min))
         s:SetValue(RT.db[dbKey] or min)
@@ -140,33 +179,36 @@ local function CreateGeneralOptions(parent)
                     if row.total then row.total:SetFont(fPath, fSize, "OUTLINE") end
                     if row.subRows then
                         for _, sr in ipairs(row.subRows) do
-                            if sr.char then sr.char:SetFont(fPath, fSize - 2, "") end
-                            if sr.details then sr.details:SetFont(fPath, fSize - 2, "") end
+                            if sr.left then sr.left:SetFont(fPath, fSize - 2, "") end
+                            if sr.right then sr.right:SetFont(fPath, fSize - 2, "") end
                         end
                     end
                 end
             end
         end)
+        y = y - 40
         return s
     end
 
-    local s1 = CreateSlider("Icon Size", 16, 64, "iconSize", nil, -260)
-    local s2 = CreateSlider("Counter Font", 8, 30, "counterFontSize", nil, -300)
-    local s3 = CreateSlider("Name Font", 8, 24, "nameFontSize", nil, -340)
-    local s4 = CreateSlider("Spacing", 0, 50, "spacing", nil, -380)
+    local s1 = CreateSlider("Icon Size", 16, 64, "iconSize", nil, nil)
+    local s2 = CreateSlider("Counter Font", 8, 30, "counterFontSize", nil, nil)
+    local s3 = CreateSlider("Name Font", 8, 24, "nameFontSize", nil, nil)
+    local s4 = CreateSlider("Spacing", 0, 50, "spacing", nil, nil)
     
     local reset = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
-    reset:SetPoint("TOPLEFT", parent, "TOPLEFT", 20, -420); reset:SetSize(140, 26); reset:SetText("Reset Position")
+    reset:SetSize(140, 26); reset:SetText("Reset Position")
     reset:SetScript("OnClick", function()
         RT.db.position = { point = "CENTER", relativePoint = "CENTER", x = 0, y = 0 }
         RT.frame:ClearAllPoints(); RT.frame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     end)
+    Place(reset, 26, 18)
 
     local dTitle = parent:CreateFontString(nil, "ARTWORK", "GameFontNormal")
-    dTitle:SetPoint("TOPLEFT", parent, "TOPLEFT", 20, -470); dTitle:SetText("Detail Menu (Tooltip) Settings:")
+    dTitle:SetText("Detail Menu (Tooltip) Settings:")
+    Place(dTitle, 20, 10)
     
-    local ds1 = CreateSlider("Menu Scale", 0.5, 2, "detailScale", nil, -510, 0.05)
-    local ds2 = CreateSlider("Menu Font Size", 8, 24, "detailFontSize", nil, -550)
+    local ds1 = CreateSlider("Menu Scale", 0.5, 2, "detailScale", nil, nil, 0.05)
+    local ds2 = CreateSlider("Menu Font Size", 8, 24, "detailFontSize", nil, nil)
 
     local expTitle = parent:CreateFontString(nil, "ARTWORK", "GameFontNormal")
     expTitle:SetPoint("TOPLEFT", parent, "TOP", 60, -10); expTitle:SetText("Show Expansions:")
@@ -243,9 +285,10 @@ local function PopulateExpansionTab(frame, key)
                 nameText:SetText(currentName)
             else
                 nameText:SetText("...")
-                ItemEventListener:AddCallback(displayID, function()
-                    local loadedName = C_Item.GetItemNameByID(displayID)
-                    if loadedName then nameText:SetText(loadedName) end
+                OnItemNameReady(displayID, function(loadedName)
+                    if loadedName then
+                        nameText:SetText(loadedName)
+                    end
                 end)
             end
             

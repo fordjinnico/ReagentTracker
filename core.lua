@@ -54,6 +54,10 @@ end
 
 local function UpdateItemData(charKey, id)
     if not id then return end
+    if not RT.db or not RT.db.charData then return end
+    RT.db.charData[charKey] = RT.db.charData[charKey] or { items = {}, bankItems = {} }
+    RT.db.charData[charKey].items = RT.db.charData[charKey].items or {}
+    RT.db.charData[charKey].bankItems = RT.db.charData[charKey].bankItems or {}
     
     local bags = C_Item.GetItemCount(id, false, false, false, false) or 0
     local totalWithBank = C_Item.GetItemCount(id, true, false, false, false) or 0
@@ -68,7 +72,7 @@ local function UpdateItemData(charKey, id)
     RT.db.warbandItems[id] = (warbandOnly > 0) and warbandOnly or nil
 end
 
-local function SyncAllItems()
+local function SyncAllItems(immediate)
     if not RT.db or not RT.db.charData or not RT_REAGENTS then return end
     
     local charKey = UnitName("player") .. "-" .. GetRealmName()
@@ -79,8 +83,19 @@ local function SyncAllItems()
         table.insert(idsToUpdate, id)
     end
 
+    if immediate then
+        for i = 1, #idsToUpdate do
+            UpdateItemData(charKey, idsToUpdate[i])
+        end
+        if RT.UpdateTracker then RT:UpdateTracker() end
+        return
+    end
+
     local index = 1
+    RT._syncRunId = (RT._syncRunId or 0) + 1
+    local runId = RT._syncRunId
     local function BatchUpdate()
+        if runId ~= RT._syncRunId then return end
         local count = 0
         while index <= #idsToUpdate and count < 20 do
             UpdateItemData(charKey, idsToUpdate[index])
@@ -123,10 +138,10 @@ f:RegisterEvent("BANKFRAME_CLOSED")
 f:RegisterEvent("PLAYER_LOGOUT")
 f:RegisterEvent("GET_ITEM_INFO_RECEIVED")
 f:RegisterEvent("AUCTION_HOUSE_CLOSED")
-f:RegisterEvent("AUCTION_HOUSE_SHOW")
 f:RegisterEvent("MAIL_CLOSED")
 
 local isThrottled = false
+local itemInfoUpdatePending = false
 
     f:SetScript("OnEvent", function(_, event, addon)
     if event == "ADDON_LOADED" and addon == addonName then
@@ -137,20 +152,6 @@ local isThrottled = false
         RT.db.charSettings = RT.db.charSettings or {}
         RT.db.charSettings[charKey] = RT.db.charSettings[charKey] or { visible = true }
         RT.charDb = RT.db.charSettings[charKey]
-
-        local function BuildItemMap(tab)
-            for _, entry in pairs(tab) do
-                if type(entry) == "table" then
-                    if type(entry[1]) == "number" then
-                        for _, id in ipairs(entry) do RT.ItemMap[id] = true end
-                    else
-                        BuildItemMap(entry)
-                    end
-                elseif type(entry) == "number" then
-                    RT.ItemMap[entry] = true
-                end
-            end
-        end
 
         if RT_REAGENTS then
             BuildItemMap(RT_REAGENTS)
@@ -172,11 +173,10 @@ local isThrottled = false
 
     if event == "BANKFRAME_CLOSED" then
         SyncAllItems() 
-        RT:UpdateTracker()
     end
 
     if event == "PLAYER_LOGOUT" then
-        SyncAllItems() 
+        SyncAllItems(true)
     end
 
 
@@ -200,10 +200,14 @@ local isThrottled = false
     end
     
     if event == "GET_ITEM_INFO_RECEIVED" then
-    if RT.UpdateTracker then
-        RT:UpdateTracker()
+        if not itemInfoUpdatePending then
+            itemInfoUpdatePending = true
+            C_Timer.After(0.2, function()
+                itemInfoUpdatePending = false
+                if RT.UpdateTracker then RT:UpdateTracker() end
+            end)
+        end
     end
-end
 end)
 
 StaticPopupDialogs["RT_SET_GOAL"] = {
@@ -222,7 +226,6 @@ StaticPopupDialogs["RT_SET_GOAL"] = {
             local currentGoal = RT.db.goals[data.key] or 0
             
 
-            local firstChar = text:sub(1, 1)
             local modifier = tonumber(text:match("^[%+%-]%d+")) 
             local absoluteValue = tonumber(text) 
             

@@ -62,10 +62,88 @@ local function GetGlobalPotential(self, targetID)
 end
 
 local detailFrame, sourceFrame
+local pigmentOutputMap = {}
+local itemNameCache = {}
+local itemNamePending = {}
+local refreshPending = false
+local activeDetailContext
+local activeSourceContext
+
+local ShowDetailMenu
+local ShowSourceMenu
+
+local function RequestTrackerRefresh()
+    if refreshPending then return end
+    refreshPending = true
+    C_Timer.After(0.1, function()
+        refreshPending = false
+        if RT and RT.UpdateTracker then RT:UpdateTracker() end
+        if detailFrame and detailFrame:IsShown() and activeDetailContext then
+            ShowDetailMenu(activeDetailContext.anchor, activeDetailContext.entry, activeDetailContext.title)
+        end
+        if sourceFrame and sourceFrame:IsShown() and activeSourceContext then
+            ShowSourceMenu(activeSourceContext.anchor, activeSourceContext.targetID)
+        end
+    end)
+end
+
+local function ResolveItemName(itemID)
+    local cached = itemNameCache[itemID]
+    if cached then return cached end
+    local name = C_Item.GetItemNameByID(itemID)
+    if name and name ~= "" then
+        itemNameCache[itemID] = name
+        return name
+    end
+    return nil
+end
+
+local function GetItemName(itemID)
+    local name = ResolveItemName(itemID)
+    if name then return name end
+
+    if C_Item.RequestLoadItemDataByID then
+        C_Item.RequestLoadItemDataByID(itemID)
+    end
+    if itemNamePending[itemID] then return nil end
+    itemNamePending[itemID] = true
+
+    if Item and Item.CreateFromItemID then
+        local item = Item:CreateFromItemID(itemID)
+        item:ContinueOnItemLoad(function()
+            itemNamePending[itemID] = nil
+            local loadedName = ResolveItemName(itemID)
+            if loadedName then
+                itemNameCache[itemID] = loadedName
+                RequestTrackerRefresh()
+            end
+        end)
+    else
+        itemNamePending[itemID] = nil
+    end
+
+    return nil
+end
+
+local function RebuildPigmentOutputMap()
+    wipe(pigmentOutputMap)
+    if not RT_PIGMENTREAGENTS then return end
+    for _, data in pairs(RT_PIGMENTREAGENTS) do
+        if data.output then
+            for targetID in pairs(data.output) do
+                pigmentOutputMap[targetID] = true
+            end
+        end
+    end
+end
+
+RebuildPigmentOutputMap()
 
 local function CloseAllMenus()
     if detailFrame then detailFrame:Hide() end
     if sourceFrame then sourceFrame:Hide() end
+    activeDetailContext = nil
+    activeSourceContext = nil
     if GameTooltip:GetOwner() == detailFrame or GameTooltip:GetOwner() == sourceFrame then
         GameTooltip:Hide()
     end
@@ -132,8 +210,9 @@ local function SetSmartTooltipAnchor(ownerFrame)
     end
 end
 
-local function ShowSourceMenu(anchor, targetID)
+ShowSourceMenu = function(anchor, targetID)
     if not RT_PIGMENTREAGENTS then return end
+    activeSourceContext = { anchor = anchor, targetID = targetID }
     sourceFrame:ClearAllPoints()
     local x, _ = anchor:GetCenter()
     if x > (GetScreenWidth() / 2) then
@@ -166,11 +245,11 @@ local function ShowSourceMenu(anchor, targetID)
             local r = sourceFrame.rows[rowIndex]
             r.itemID = herbID; r.name:SetFont(fPath, fSize, ""); r.total:SetFont(fPath, fSize, "OUTLINE")
             r.icon:SetTexture(C_Item.GetItemIconByID(herbID))
-            local hName = C_Item.GetItemNameByID(herbID) or "Loading..."
+            local hName = GetItemName(herbID) or "Loading..."
             if count == 0 then
                 r.name:SetText("|cff888888" .. hName .. "|r"); r.total:SetText("|cff8888880|r"); r.icon:SetDesaturated(true)
             else
-                local potential = math.floor((count / data.input) * data.output[targetID])
+                local potential = math.floor(count / data.input) * data.output[targetID]
                 r.name:SetText(hName); r.total:SetText(string.format("%d |cff00ff00(+%d)|r", count, potential)); r.icon:SetDesaturated(false)
             end
             local locs = {}
@@ -198,8 +277,9 @@ local function ShowSourceMenu(anchor, targetID)
     if rowIndex == 1 then sourceFrame:Hide() else sourceFrame:SetSize(MENU_WIDTH, math.abs(yOffset) + 10) end
 end
 
-local function ShowDetailMenu(anchor, entry, title)
+ShowDetailMenu = function(anchor, entry, title)
     if not RT.db then return end
+    activeDetailContext = { anchor = anchor, entry = entry, title = title }
     detailFrame:SetScale(RT.db.detailScale or 1); sourceFrame:SetScale(RT.db.detailScale or 1)
     local fSize, fPath, MENU_WIDTH = RT.db.detailFontSize or 12, "Fonts\\FRIZQT__.TTF", 340
     detailFrame:ClearAllPoints(); local x, _ = anchor:GetCenter()
@@ -249,7 +329,8 @@ local function ShowDetailMenu(anchor, entry, title)
         end
         local r = detailFrame.rows[rowIndex]; r.itemID = id
         r.name:SetFont(fPath, fSize, ""); r.total:SetFont(fPath, fSize, "OUTLINE"); r.icon:SetTexture(C_Item.GetItemIconByID(id))
-        r.name:SetText((C_Item.GetItemNameByID(id) or "Loading...") .. " " .. GetQualityIcon(C_TradeSkillUI.GetItemReagentQualityByItemInfo(id)))
+        local itemName = GetItemName(id) or "Loading..."
+        r.name:SetText(itemName .. " " .. GetQualityIcon(C_TradeSkillUI.GetItemReagentQualityByItemInfo(id)))
         r.total:SetText(RT:GetAccountWideCount(id) .. (GetGlobalPotential(RT, id) > 0 and (" |cff00ff00(+" .. GetGlobalPotential(RT, id) .. ")|r") or ""))
         r:SetPoint("TOPLEFT", 10, yOffset); r:Show()
         yOffset = yOffset - CreateLocationRows(r, locs, -26, fPath, fSize) - 8; rowIndex = rowIndex + 1
@@ -260,9 +341,28 @@ end
 function RT:UpdateTracker()
     if not self.frame or not self.db or not self.charDb then return end
     if self.charDb.visible == false then self.frame:Hide(); return else self.frame:Show() end
+    if not next(pigmentOutputMap) and RT_PIGMENTREAGENTS then
+        RebuildPigmentOutputMap()
+    end
 
     for _, f in ipairs(RT.IconFrames) do f:Hide() end
     local activeElements = {}
+    local countCache = {}
+    local potentialCache = {}
+    local function GetCountCached(id)
+        local cached = countCache[id]
+        if cached ~= nil then return cached end
+        cached = self:GetAccountWideCount(id)
+        countCache[id] = cached
+        return cached
+    end
+    local function GetPotentialCached(id)
+        local cached = potentialCache[id]
+        if cached ~= nil then return cached end
+        cached = GetGlobalPotential(self, id)
+        potentialCache[id] = cached
+        return cached
+    end
     local function Collect(data, exp)
         if exp and self.db.showExpansion[exp] == false then return end
         if type(data) == "table" and data[1] then
@@ -283,8 +383,23 @@ function RT:UpdateTracker()
     for i, entry in ipairs(activeElements) do
         local key = type(entry) == "table" and table.concat(entry, "_") or tostring(entry)
         local displayID = type(entry) == "table" and (type(entry[1]) == "table" and entry[1][1] or entry[1]) or entry
-        local count = self:GetAccountWideCount(entry)
-        local potential = (type(entry) == "table") and (function() local p=0; for _, id in ipairs(entry) do p=p+GetGlobalPotential(self, id) end; return p end)() or GetGlobalPotential(self, entry)
+        local count = 0
+        if type(entry) == "table" then
+            for _, id in ipairs(entry) do
+                count = count + GetCountCached(id)
+            end
+        else
+            count = GetCountCached(entry)
+        end
+
+        local potential = 0
+        if type(entry) == "table" then
+            for _, id in ipairs(entry) do
+                potential = potential + GetPotentialCached(id)
+            end
+        else
+            potential = GetPotentialCached(entry)
+        end
 
         local row = RT.IconFrames[i] or CreateFrame("Frame", nil, self.frame)
         if not RT.IconFrames[i] then
@@ -292,6 +407,68 @@ function RT:UpdateTracker()
             row.tex = row:CreateTexture(nil, "ARTWORK"); row.tex:SetAllPoints(row)
             row.txt = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
             row.fsIcon = row:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+
+            row:SetScript("OnEnter", function(s)
+                local owner = s.owner
+                local entryData = s.entry
+                local display = s.displayID
+                local displayName = s.nameStr
+                if not owner or not display then return end
+                if IsMouseButtonDown("LeftButton") then return end
+                GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
+                if type(entryData) == "table" then
+                    GameTooltip:AddLine(displayName or "Loading...", 1, 0.82, 0)
+                    for _, id in ipairs(entryData) do
+                        local tID = owner:GetAccountWideCount(id)
+                        local q = C_TradeSkillUI.GetItemReagentQualityByItemInfo(id)
+                        GameTooltip:AddDoubleLine(GetQualityIcon(q) .. " " .. (GetItemName(id) or "Loading..."), (tID > 0 and "|cffffffff" or "|cff888888") .. tID .. "|r")
+                    end
+                else
+                    GameTooltip:SetItemByID(display)
+                end
+                GameTooltip:Show()
+            end)
+            row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+            row:SetScript("OnMouseDown", function(s, btn)
+                local owner = s.owner
+                if not owner then return end
+                if btn == "LeftButton" then
+                    if IsShiftKeyDown() then
+                        owner.db.enabled[s.key] = false
+                        owner:UpdateTracker()
+                    else
+                        ShowDetailMenu(s, s.entry, s.nameStr or "Loading...")
+                        local isPigment = pigmentOutputMap[s.displayID] == true
+                        if (s.potential or 0) > 0 or isPigment then
+                            ShowSourceMenu(detailFrame, s.displayID)
+                        end
+                    end
+                elseif btn == "RightButton" then
+                    if IsShiftKeyDown() then
+                        owner.db.goals[s.key] = nil
+                        owner:UpdateTracker()
+                    else
+                        local p = StaticPopup_Show("RT_SET_GOAL")
+                        if p then p.data = { key = s.key } end
+                    end
+                end
+            end)
+
+            row:SetScript("OnDragStart", function(s)
+                local owner = s.owner
+                if owner and not owner.db.locked then
+                    CloseAllMenus()
+                    owner.frame:StartMoving()
+                end
+            end)
+            row:SetScript("OnDragStop", function(s)
+                local owner = s.owner
+                if not owner then return end
+                owner.frame:StopMovingOrSizing()
+                local p, _, rp, x, y = owner.frame:GetPoint()
+                owner.db.position = { point = p, relativePoint = rp, x = x, y = y }
+            end)
             RT.IconFrames[i] = row
         end
         row:Show(); row:SetSize(self.db.iconSize, self.db.iconSize); row.tex:SetTexture(C_Item.GetItemIconByID(displayID))
@@ -301,7 +478,13 @@ function RT:UpdateTracker()
         if potential > 0 then countLabel = countLabel .. " |cff00ff00(+" .. potential .. ")|r" end
 
         row.txt:SetFont(row.txt:GetFont(), self.db.nameFontSize)
-        local nameStr = C_Item.GetItemNameByID(displayID) or "Loading..."
+        local nameStr = GetItemName(displayID) or "Loading..."
+        row.owner = self
+        row.key = key
+        row.entry = entry
+        row.displayID = displayID
+        row.nameStr = nameStr
+        row.potential = potential
         row.txt:SetText((self.db.showNames and self.db.showCountInName) and (nameStr .. ": " .. countLabel) or (self.db.showNames and nameStr or (self.db.showCountInName and countLabel or "")))
         
         local txtAnchor = {Right={"LEFT",row,"RIGHT",8,0}, Left={"RIGHT",row,"LEFT",-8,0}, Top={"BOTTOM",row,"TOP",0,4}, Bottom={"TOP",row,"BOTTOM",0,-4}}
@@ -310,46 +493,6 @@ function RT:UpdateTracker()
 
         row.fsIcon:ClearAllPoints(); row.fsIcon:SetPoint("BOTTOMRIGHT", row, -1, 1); row.fsIcon:SetFont(row.fsIcon:GetFont(), self.db.counterFontSize, "OUTLINE")
         row.fsIcon:SetText(countLabel); row.fsIcon:SetShown(self.db.showCountOnIcon)
-
-        row:SetScript("OnEnter", function(s)
-            if IsMouseButtonDown("LeftButton") then return end
-            GameTooltip:SetOwner(s, "ANCHOR_RIGHT")
-            if type(entry) == "table" then
-                GameTooltip:AddLine(nameStr, 1, 0.82, 0)
-                for _, id in ipairs(entry) do
-                    local tID = self:GetAccountWideCount(id); local q = C_TradeSkillUI.GetItemReagentQualityByItemInfo(id)
-                    GameTooltip:AddDoubleLine(GetQualityIcon(q) .. " " .. (C_Item.GetItemNameByID(id) or "Loading..."), (tID > 0 and "|cffffffff" or "|cff888888") .. tID .. "|r")
-                end
-            else 
-                GameTooltip:SetItemByID(displayID) 
-            end
-            GameTooltip:Show()
-        end)
-        row:SetScript("OnLeave", function() GameTooltip:Hide() end)
-
-        row:SetScript("OnMouseDown", function(_, btn)
-            if btn == "LeftButton" then
-                if IsShiftKeyDown() then 
-                    self.db.enabled[key] = false; self:UpdateTracker()
-                else 
-                    ShowDetailMenu(row, entry, nameStr)
-                    local isPigment = false
-                    if RT_PIGMENTREAGENTS then
-                        for _, data in pairs(RT_PIGMENTREAGENTS) do
-                            if data.output[displayID] then isPigment = true; break end
-                        end
-                    end
-                    if potential > 0 or isPigment then 
-                        ShowSourceMenu(detailFrame, displayID) 
-                    end
-                end
-            elseif btn == "RightButton" then
-                if IsShiftKeyDown() then self.db.goals[key] = nil; self:UpdateTracker()
-                else local p = StaticPopup_Show("RT_SET_GOAL"); if p then p.data = {key=key} end end
-            end
-        end)
-        row:SetScript("OnDragStart", function() if not self.db.locked then CloseAllMenus(); self.frame:StartMoving() end end)
-        row:SetScript("OnDragStop", function() self.frame:StopMovingOrSizing(); local p, _, rp, x, y = self.frame:GetPoint(); self.db.position = {point=p, relativePoint=rp, x=x, y=y} end)
 
         row:ClearAllPoints(); local spc, sz = self.db.spacing or 5, self.db.iconSize
         if isH then

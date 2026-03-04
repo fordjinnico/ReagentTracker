@@ -403,12 +403,43 @@ RT_REAGENTS = {
             { 236770, 236771 }, -- Sanguithorn
             236780, -- Nocturnal Lotus
         },
-        Cloth = {},
+        Motes = {
+            236949, -- Mote of Light
+            236951, -- Mote of Wild Magic
+            236950, -- Mote of Primal Energy
+            236952, -- Mote of Pure Void
+        },
+        Cloth = {
+            {236963, 236965 }, -- Bright Linen
+        },
+        Skinning = {
+            { 238511, 238512 }, -- Void-tempered Leather
+            { 238513, 238514 }, -- Void-tempered Scales
+            { 238518, 238519 }, -- Void-tempered Hide
+            { 238520, 238521 }, -- Void-tempered Plating
+            238523,             -- Carving Canine
+            238522,             -- Peerless plumage
+            238525,             -- Fantastic fur
+            238529,             -- Majestic Hide
+            238530,             -- Majestic Fin
+            238528, -- Majestic Claw 
+            
+        },
+        Pigments = {
+            {245807, 245808}, -- Powder pigment
+            { 245803, 245804 }, -- Argentleaf pigment
+            { 245867, 245866 }, -- Mana Lily pigment
+            {245865, 245864}, -- Sanguithorn pigment
+
+            
+        },
         Fishing = {}
   },
 }
 
 RT_PIGMENTREAGENTS = {
+   
+ 
     [765] = { -- Silverleaf milling
         input = 5,
         output = {
@@ -427,6 +458,55 @@ RT_PIGMENTREAGENTS = {
         output = {
             [39334] = 2,
             [43103] = 0.5,
+        }
+    },
+
+    [236761] = {-- Tranquility Bloom 1-star milling 
+        input = 10,
+        output = {
+        [245807] = 13
+        }
+    },
+    [236767] = { -- Tranquility Bloom 2-star milling
+        input = 10,
+        output = {
+        [245808] = 13
+        }
+    },
+    [236776] = { -- Argentleaf 2-star milling
+        input = 10,
+        output = {
+        [245803] = 13
+        }
+    },
+    [236777] = { -- Argentleaf 2-star milling
+        input = 10,
+        output = {
+        [245804] = 13
+        }
+    },
+    [236778] = { -- Mana Lily 1-star milling
+        input = 10,
+        output = {
+        [245867] = 13
+        }
+    },
+    [236779] = { -- Mana Lily 2-star milling
+        input = 10,
+        output = {
+        [245866] = 13
+        }
+    },
+    [236770] = { -- Sanguithorn 1-star milling
+        input = 10,
+        output = {
+        [245865] = 13
+        }
+    },
+    [236771] = { -- Sanguithorn 2-star milling
+        input = 10,
+        output = {
+        [245864] = 13
         }
     },
 }
